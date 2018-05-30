@@ -1,14 +1,30 @@
+# TARGETS	= sikradio-sender
+# CXX	= g++
+# CXXFLAGS=  -std=c++17 -Wall -O2
+
+# all: $(TARGETS) 
+
+# err.o: err.h
+# 	gcc
+
+# sikradio-sender: sikradio-sender.cc err.o
+# 	$(CXX) $(CXXFLAGS) $^ -o $@ -lboost_program_options
+
+
+# .PHONY: clean TARGET
+# clean:
+# 	rm -f server client *.o *~ *.bak
+# 	
+
 TARGETS = sikradio-sender
 
-CC     = gcc
-CFLAGS = -Wall -O2
-LFLAGS = -Wall
+CC     = g++
+CFLAGS = -Wall -O2 -std=c++17
 
 all: $(TARGETS)
 
-sikradio-sender.o err.o: err.h
-
 sikradio-sender: sikradio-sender.o err.o
+	$(CXX) $(CXXFLAGS) $^ -o $@ -lboost_program_options
 
 .PHONY: clean
 
