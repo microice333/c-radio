@@ -33,6 +33,7 @@ class Server {
 	void control();
 	void collect_packages(std::string statement);
 	void retransmission();
+	uint64_t htonll(uint64_t value);
 public:
 	void check_and_set_params(int argc, char *argv[]);
 	void run();

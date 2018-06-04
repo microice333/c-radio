@@ -69,9 +69,9 @@ int main (int argc, char *argv[]) {
     recv(sock, &data_read, sizeof(data_read), 0);
     // rcv_len = read(sock, buffer, sizeof buffer);
     // printf("%ld %ld\n", data_read.session_id, data_read.first_byte_num);
-      // if (data_read.first_byte_num == 1024) {
-        // printf("dostalem\n");
-      // }
+      if (data_read.first_byte_num == 1024 || data_read.first_byte_num == 512 || data_read.first_byte_num == 1536 || data_read.first_byte_num == 5632 || data_read.first_byte_num == 3584) {
+        fprintf(stderr, "dostalem %ld\n", data_read.first_byte_num);
+      }
     write(1, data_read.audio_data, sizeof data_read.audio_data);
     // printf("%s\n", data_read.audio_data);
     // if (rcv_len < 0)

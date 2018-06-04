@@ -9,7 +9,7 @@ const int DEFAULT_RTIME = 250;
 const std::string DEAFULT_NAZWA = "Nienazwany Nadajnik";
 const int TTL_VALUE = 4;
 const int BSIZE = 1024;
-const std::string LOOKUP = "ZERO_SEVEN_COME_IN";
+const std::string LOOKUP = "ZERO_SEVEN_COME_IN\n";
 const std::string REPLY = "BOREWICZ_HERE ";
 const std::string REXMIT = "LOUDER_PLEASE ";
 
