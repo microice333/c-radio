@@ -13,9 +13,19 @@
 #define REPEAT_COUNT  30
 
 struct __attribute__((__packed__)) Audio {
-  uint64_t session_id;
-  uint64_t first_byte_num;
-  char audio_data[512];
+  union {
+    uint64_t session_id;
+    char session_c[8];
+  };
+  union {
+      uint64_t first_byte_num;
+      char byte_num_char[8];
+    };
+    char audio_data[512];
+
+    ~Audio() {
+      delete[] audio_data;
+    }
 };
 
 int main (int argc, char *argv[]) {
@@ -63,15 +73,23 @@ int main (int argc, char *argv[]) {
   if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
     syserr("bind");
 
+  uint64_t prev = 0;
   while(1) {
     (void) memset(data_read.audio_data, 0, sizeof(data_read.audio_data));
     // printf("%ld %ld %s\n", data_read.session_id, data_read.first_byte_num, data_read.audio_data);
     recv(sock, &data_read, sizeof(data_read), 0);
     // rcv_len = read(sock, buffer, sizeof buffer);
     // printf("%ld %ld\n", data_read.session_id, data_read.first_byte_num);
-      if (data_read.first_byte_num == 1024 || data_read.first_byte_num == 512 || data_read.first_byte_num == 1536 || data_read.first_byte_num == 5632 || data_read.first_byte_num == 3584) {
-        fprintf(stderr, "dostalem %ld\n", data_read.first_byte_num);
+      uint64_t xd = be64toh(data_read.first_byte_num);
+      if (xd == 1024 || xd == 512 || xd == 1536 || xd == 5632 || xd == 3584|| xd == 2048 || xd == 4096 || xd == 8192) {
+        fprintf(stderr, "dostalem %ld\n", xd);
       }
+
+    // if (data_read.first_byte_num - prev != 512) {
+      // fprintf(stderr, "brak %ld a dostalem %ld\n", prev, data_read.first_byte_num);
+    // }
+
+    prev = data_read.first_byte_num;
     write(1, data_read.audio_data, sizeof data_read.audio_data);
     // printf("%s\n", data_read.audio_data);
     // if (rcv_len < 0)

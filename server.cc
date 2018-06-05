@@ -99,42 +99,44 @@ char* Server::audio_to_char(char result[], Audio *audio) {
 void Server::read_and_send() {
 	init_send_socket();
 
-	ssize_t read_bytes, len;
+	ssize_t read_bytes, len, snd_len;
 	uint64_t byte_num = 0;
 	char buffer[PSIZE];
 	Audio data_to_send;
 	time_t session_id = time(0);
-	int fifo_size = FSIZE / PSIZE;
+	uint fifo_size = FSIZE / PSIZE;
+	char result[PSIZE + 16];
 	
 	bzero(buffer, sizeof buffer);
 
 	while ((read_bytes = read(0, buffer, sizeof buffer))) {
     	if (read_bytes == PSIZE) {
-    		char audio_data[PSIZE];
-    		data_to_send.session_id =  htonll(session_id);
-    		data_to_send.first_byte_num = htonll(byte_num);
-    		data_to_send.audio_data = audio_data;
+    		data_to_send.session_id =  htobe64(session_id);
+    		data_to_send.first_byte_num = htobe64(byte_num);
+    		data_to_send.audio_data = new char[PSIZE];
 
     		for (int i = 0; i < PSIZE; i++) {
     			data_to_send.audio_data[i] = buffer[i];
     		}
 
-    		fifo_map[byte_num] = data_to_send;
-    		
-    		if (fifo_map.size() > fifo_size) {
-    			fifo_mutex.lock();
-    			fifo_map.erase(fifo_map.begin());
-    			fifo_mutex.unlock();
-    		}
-
-    		char result[PSIZE + 16];
     		bzero(result, sizeof result);
     		audio_to_char(result, &data_to_send);
 
     		byte_num += PSIZE;
     		len = sizeof(result);
+
+    		sock_mutex.lock();
+
+    		fifo_map[byte_num] = data_to_send;
     		
-    		if (write(sock, result, sizeof result) != len) 
+    		if (fifo_map.size() > fifo_size) {
+    			fifo_map.erase(fifo_map.begin());
+    		}
+    		
+    		snd_len = write(sock, result, sizeof result);
+    		sock_mutex.unlock();
+
+    		if (snd_len != len) 
     			syserr("partial / failed write");
     	}
     }
@@ -176,8 +178,12 @@ void Server::control() {
 
         	if (statement == LOOKUP) {
         		string reply = REPLY + MCAST_ADDR + " " + to_string(DATA_PORT) + " " + NAZWA + "\n";
+        		
         		snd_len = sendto(ctrl_sock, reply.c_str(), (size_t) reply.size(), 0,
             		(struct sockaddr *) &client_address, snda_len);
+        		
+        		if (snd_len != (ssize_t) reply.size())
+              		syserr("write");
         	} else if (statement.find(REXMIT) == 0) {
         		collect_packages(statement.substr(REXMIT.size()));
         	}
@@ -218,43 +224,21 @@ void Server::retransmission() {
 		
 		retransmission_packages_mutex.unlock();
 
-		fifo_mutex.lock();
-		
-		std::map<uint64_t, Audio> fifo_map_copy(fifo_map);
-
-		fifo_mutex.unlock();
+		sock_mutex.lock();
 		
 		for (auto byte_num : retransmission_packages_copy) {
-			if (fifo_map_copy.find(byte_num) != fifo_map_copy.end()) {
+			if (fifo_map.find(byte_num) != fifo_map.end()) {
 				char result[PSIZE + 16];
     			bzero(result, sizeof result);
-    			audio_to_char(result, &fifo_map_copy[byte_num]);
+    			audio_to_char(result, &fifo_map[byte_num]);
 
     			len = sizeof(result);
-    		
+    			
     			if (write(sock, result, sizeof result) != len) 
     				syserr("partial / failed write");	
 			}
 		}
+
+		sock_mutex.unlock();
 	}
-}
-
-
-//function taken from 
-//https://stackoverflow.com/questions/3022552/is-there-any-standard-htonl-like-function-for-64-bits-integers-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-uint64_t Server::htonll(uint64_t value)
-{
-    static const int num = 42;
-
-    // Check the endianness
-    if (*reinterpret_cast<const char*>(&num) == num)
-    {
-        const uint32_t high_part = htonl(static_cast<uint32_t>(value >> 32));
-        const uint32_t low_part = htonl(static_cast<uint32_t>(value & 0xFFFFFFFFLL));
-
-        return (static_cast<uint64_t>(low_part) << 32) | high_part;
-    } else
-    {
-        return value;
-    }
 }

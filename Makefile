@@ -1,7 +1,9 @@
 TARGETS = sikradio-sender sikradio-reciver
 
-CC     = g++
-CFLAGS = -Wall -O2 -std=c++17
+CC     = gcc
+CFLAGS = -Wall -O2 -std=c99
+CXX = g++
+CXXFLAGS = -Wall -O2 -std=c++17
 
 all: $(TARGETS)
 

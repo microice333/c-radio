@@ -20,7 +20,7 @@ class Server {
 	int RTIME;
 	std::string NAZWA;
 
-	std::mutex fifo_mutex;
+	std::mutex sock_mutex;
 	std::mutex retransmission_packages_mutex;
 
 	std::map<uint64_t, Audio> fifo_map;
@@ -33,7 +33,6 @@ class Server {
 	void control();
 	void collect_packages(std::string statement);
 	void retransmission();
-	uint64_t htonll(uint64_t value);
 public:
 	void check_and_set_params(int argc, char *argv[]);
 	void run();

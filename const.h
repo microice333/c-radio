@@ -23,6 +23,10 @@ struct __attribute__((__packed__)) Audio {
   		char byte_num_char[8];
   	};
   	char *audio_data;
+
+  	~Audio() {
+  		delete[] audio_data;
+  	}
 };
 
 #endif
