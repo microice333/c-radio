@@ -11,12 +11,22 @@
 #include <vector>
 #include <ctime>
 #include <thread>
+#include <cinttypes>
 
 #include "err.h"
 #include "server.h"
+#include "const.h"
 
 namespace po = boost::program_options;
 using namespace std;
+
+void Audio::to_char_array(char result[], int size) {
+	sprintf(result, "%" PRIu64, session_id);
+	sprintf(result + 8, "%" PRIu64, first_byte_num);
+
+	for (int i = SESSION_AND_BYTE_SIZE; i < size; i++)
+   		result[i] = audio_data[i - SESSION_AND_BYTE_SIZE];
+}
 
 void Server::init_send_socket() {
 	int optval;
@@ -85,17 +95,6 @@ void Server::check_and_set_params(int argc, char *argv[]) {
 	}
 }
 
-char* Server::audio_to_char(char result[], Audio *audio) {
-    for (int i = 0; i < 8; i++) 
-   		result[i] = audio->session_c[i];
-  	for (int i = 8; i < 16; i++)
-   		result[i] = audio->byte_num_char[i - 8];
-  	for (int i = 16; i < PSIZE; i++)
-   		result[i] = audio->audio_data[i - 16];
-
-   	return result;
-}
-
 void Server::read_and_send() {
 	init_send_socket();
 
@@ -105,7 +104,7 @@ void Server::read_and_send() {
 	Audio data_to_send;
 	time_t session_id = time(0);
 	uint fifo_size = FSIZE / PSIZE;
-	char result[PSIZE + 16];
+	char result[PSIZE + SESSION_AND_BYTE_SIZE];
 	
 	bzero(buffer, sizeof buffer);
 
@@ -120,7 +119,7 @@ void Server::read_and_send() {
     		}
 
     		bzero(result, sizeof result);
-    		audio_to_char(result, &data_to_send);
+    		data_to_send.to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
 
     		byte_num += PSIZE;
     		len = sizeof(result);
@@ -139,6 +138,8 @@ void Server::read_and_send() {
     		if (snd_len != len) 
     			syserr("partial / failed write");
     	}
+
+ 		bzero(buffer, sizeof buffer);
     }
 
   	close(sock);
@@ -228,9 +229,9 @@ void Server::retransmission() {
 		
 		for (auto byte_num : retransmission_packages_copy) {
 			if (fifo_map.find(byte_num) != fifo_map.end()) {
-				char result[PSIZE + 16];
+				char result[PSIZE + SESSION_AND_BYTE_SIZE];
     			bzero(result, sizeof result);
-    			audio_to_char(result, &fifo_map[byte_num]);
+    			fifo_map[byte_num].to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
 
     			len = sizeof(result);
     			

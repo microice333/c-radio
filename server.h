@@ -7,7 +7,17 @@
 #include <set>
 #include <mutex>
 
-#include "const.h"
+struct Audio {
+	uint64_t session_id;
+  	uint64_t first_byte_num;
+  	char *audio_data;
+
+  	void to_char_array(char result[], int size);
+
+  	~Audio() {
+  		delete[] audio_data;
+  	}
+};
 
 class Server {
 	int sock;
@@ -26,7 +36,6 @@ class Server {
 	std::map<uint64_t, Audio> fifo_map;
 	std::set<uint64_t> retransmission_packages;
 
-	char* audio_to_char(char result[], Audio *audio);
 	void read_and_send();
 	void init_send_socket();
 	void init_ctrl_socket();
