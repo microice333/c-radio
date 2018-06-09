@@ -11,7 +11,7 @@
 #include <vector>
 #include <ctime>
 #include <thread>
-#include <cinttypes>
+#include <iostream>
 
 #include "err.h"
 #include "server.h"
@@ -21,51 +21,57 @@ namespace po = boost::program_options;
 using namespace std;
 
 void Audio::to_char_array(char result[], int size) {
-	sprintf(result, "%" PRIu64, session_id);
-	sprintf(result + 8, "%" PRIu64, first_byte_num);
+	for (int i = 0; i < 8; i++) {
+		result[i] = session_id_c[i];
+	}
 
-	for (int i = SESSION_AND_BYTE_SIZE; i < size; i++)
+	for (int i = 8; i < SESSION_AND_BYTE_SIZE; i++) {
+		result[i] = first_byte_num_c[i - 8];
+	}
+
+	for (int i = SESSION_AND_BYTE_SIZE; i < size; i++) {
    		result[i] = audio_data[i - SESSION_AND_BYTE_SIZE];
+	}
 }
 
 void Server::init_send_socket() {
 	int optval;
 	struct sockaddr_in remote_address;
 
-  	sock = socket(AF_INET, SOCK_DGRAM, 0);
-  	if (sock < 0)
-    	syserr("socket");
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0)
+		syserr("socket");
 
-  	optval = 1;
-  	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
-    	syserr("setsockopt broadcast");
+	optval = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
+		syserr("setsockopt broadcast");
 
-  	optval = TTL_VALUE;
-  	if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&optval, sizeof optval) < 0)
-    	syserr("setsockopt multicast ttl");
+	optval = TTL_VALUE;
+	if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&optval, sizeof optval) < 0)
+		syserr("setsockopt multicast ttl");
 
-  	remote_address.sin_family = AF_INET;
-  	remote_address.sin_port = htons((in_port_t)DATA_PORT);
-  	if (inet_aton(MCAST_ADDR.c_str(), &remote_address.sin_addr) == 0)
-    	syserr("inet_aton");
-  	if (connect(sock, (struct sockaddr *)&remote_address, sizeof remote_address) < 0)
-    	syserr("connect");
+	remote_address.sin_family = AF_INET;
+	remote_address.sin_port = htons((in_port_t)DATA_PORT);
+	if (inet_aton(MCAST_ADDR.c_str(), &remote_address.sin_addr) == 0)
+		syserr("inet_aton");
+	if (connect(sock, (struct sockaddr *)&remote_address, sizeof remote_address) < 0)
+		syserr("connect");
 }
 
 void Server::init_ctrl_socket() {
 	struct sockaddr_in local_address;
 
-  	ctrl_sock = socket(AF_INET, SOCK_DGRAM, 0);
+	ctrl_sock = socket(AF_INET, SOCK_DGRAM, 0);
   	
-  	if (ctrl_sock < 0)
-    	syserr("socket");
+	if (ctrl_sock < 0)
+		syserr("socket");
   	
-  	local_address.sin_family = AF_INET;
-  	local_address.sin_addr.s_addr = htonl(INADDR_ANY);
-  	local_address.sin_port = htons((in_port_t)CTRL_PORT);
+	local_address.sin_family = AF_INET;
+	local_address.sin_addr.s_addr = htonl(INADDR_ANY);
+	local_address.sin_port = htons((in_port_t)CTRL_PORT);
   	
-  	if (bind(ctrl_sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
-    	syserr("bind");
+	if (bind(ctrl_sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
+		syserr("bind");
 }
 
 void Server::check_and_set_params(int argc, char *argv[]) {
@@ -98,7 +104,7 @@ void Server::check_and_set_params(int argc, char *argv[]) {
 void Server::read_and_send() {
 	init_send_socket();
 
-	ssize_t read_bytes, len, snd_len;
+	ssize_t len, snd_len;
 	uint64_t byte_num = 0;
 	char buffer[PSIZE];
 	Audio data_to_send;
@@ -108,41 +114,38 @@ void Server::read_and_send() {
 	
 	bzero(buffer, sizeof buffer);
 
-	while ((read_bytes = read(0, buffer, sizeof buffer))) {
-    	if (read_bytes == PSIZE) {
-    		data_to_send.session_id =  htobe64(session_id);
-    		data_to_send.first_byte_num = htobe64(byte_num);
-    		data_to_send.audio_data = new char[PSIZE];
+	while (cin.read(buffer, PSIZE)) {
+		data_to_send.session_id =  htobe64(session_id);
+		data_to_send.first_byte_num = htobe64(byte_num);
+		data_to_send.audio_data = new char[PSIZE];
 
-    		for (int i = 0; i < PSIZE; i++) {
-    			data_to_send.audio_data[i] = buffer[i];
-    		}
+		for (int i = 0; i < PSIZE; i++) {
+			data_to_send.audio_data[i] = buffer[i];
+		}
 
-    		bzero(result, sizeof result);
-    		data_to_send.to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
+		bzero(result, sizeof result);
+		data_to_send.to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
 
-    		byte_num += PSIZE;
-    		len = sizeof(result);
+		byte_num += PSIZE;
+		len = sizeof(result);
 
-    		sock_mutex.lock();
+		sock_mutex.lock();
 
-    		fifo_map[byte_num] = data_to_send;
-    		
-    		if (fifo_map.size() > fifo_size) {
-    			fifo_map.erase(fifo_map.begin());
-    		}
-    		
-    		snd_len = write(sock, result, sizeof result);
-    		sock_mutex.unlock();
+		fifo_map[byte_num] = data_to_send;
+	    		
+		if (fifo_map.size() > fifo_size) 
+			fifo_map.erase(fifo_map.begin());
+	    	
+		snd_len = write(sock, result, sizeof result);
+		sock_mutex.unlock();
 
-    		if (snd_len != len) 
-    			syserr("partial / failed write");
-    	}
+		if (snd_len != len) 
+			syserr("partial / failed write");
+	 	  
+		bzero(buffer, sizeof buffer);
+	}
 
- 		bzero(buffer, sizeof buffer);
-    }
-
-  	close(sock);
+	close(sock);
 }
 
 void Server::run() {
@@ -158,40 +161,40 @@ void Server::run() {
 
 void Server::control() {
 	struct sockaddr_in client_address;
-  	socklen_t snda_len, rcva_len;
-  	char buffer[BSIZE];
-  	ssize_t snd_len, len;
+	socklen_t snda_len, rcva_len;
+	char buffer[BSIZE];
+	ssize_t snd_len, len;
 
-  	bzero(buffer, sizeof buffer);
+ 	bzero(buffer, sizeof buffer);
 
-  	init_ctrl_socket();
+	init_ctrl_socket();
 
-    while(true) {
-    	rcva_len = (socklen_t) sizeof(client_address);
-    	snda_len = (socklen_t) sizeof(client_address);
-    	len = recvfrom(ctrl_sock, buffer, sizeof(buffer), 0,
-         	(struct sockaddr *) &client_address, &rcva_len);
+	while(true) {
+		rcva_len = (socklen_t) sizeof(client_address);
+		snda_len = (socklen_t) sizeof(client_address);
+		len = recvfrom(ctrl_sock, buffer, sizeof(buffer), 0,
+			(struct sockaddr *) &client_address, &rcva_len);
 
-    	if (len < 0)
-        	syserr("error on datagram from client socket");
-      	else {
-        	string statement = string(buffer);
+		if (len < 0) {
+			syserr("error on datagram from client socket");
+		} else {
+			string statement = string(buffer);
 
-        	if (statement == LOOKUP) {
-        		string reply = REPLY + MCAST_ADDR + " " + to_string(DATA_PORT) + " " + NAZWA + "\n";
+			if (statement == LOOKUP) {
+				string reply = REPLY + MCAST_ADDR + " " + to_string(DATA_PORT) + " " + NAZWA + "\n";
         		
-        		snd_len = sendto(ctrl_sock, reply.c_str(), (size_t) reply.size(), 0,
-            		(struct sockaddr *) &client_address, snda_len);
+				snd_len = sendto(ctrl_sock, reply.c_str(), (size_t) reply.size(), 0,
+					(struct sockaddr *) &client_address, snda_len);
         		
-        		if (snd_len != (ssize_t) reply.size())
-              		syserr("write");
-        	} else if (statement.find(REXMIT) == 0) {
-        		collect_packages(statement.substr(REXMIT.size()));
-        	}
-    	}
- 	}
+				if (snd_len != (ssize_t) reply.size())
+					syserr("write");
+			} else if (statement.find(REXMIT) == 0) {
+				collect_packages(statement.substr(REXMIT.size()));
+			}
+		}
+	}
 
- 	close(ctrl_sock);
+	close(ctrl_sock);
 }
 
 void Server::collect_packages(string statement) {
@@ -217,7 +220,7 @@ void Server::retransmission() {
 	ssize_t len;
 
 	while (true) {
-		sleep(RTIME);
+		this_thread::sleep_for(std::chrono::milliseconds(RTIME));
 		retransmission_packages_mutex.lock();
 		
 		set<uint64_t> retransmission_packages_copy(retransmission_packages);
@@ -230,13 +233,13 @@ void Server::retransmission() {
 		for (auto byte_num : retransmission_packages_copy) {
 			if (fifo_map.find(byte_num) != fifo_map.end()) {
 				char result[PSIZE + SESSION_AND_BYTE_SIZE];
-    			bzero(result, sizeof result);
-    			fifo_map[byte_num].to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
+				bzero(result, sizeof result);
+				fifo_map[byte_num].to_char_array(result, PSIZE + SESSION_AND_BYTE_SIZE);
 
-    			len = sizeof(result);
+				len = sizeof(result);
     			
-    			if (write(sock, result, sizeof result) != len) 
-    				syserr("partial / failed write");	
+				if (write(sock, result, sizeof result) != len) 
+					syserr("partial / failed write");	
 			}
 		}
 

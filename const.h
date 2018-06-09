@@ -4,7 +4,7 @@
 const int DEFAULT_DATA_PORT = 20000 + (370768 % 10000);
 const int DEFAULT_CTRL_PORT = 30000 + (370768 % 10000);
 const int DEFAULT_PSIZE = 512;
-const int DEFAULT_FSIZE = 128000;
+const int DEFAULT_FSIZE = 131072;
 const int DEFAULT_RTIME = 250;
 const std::string DEAFULT_NAZWA = "Nienazwany Nadajnik";
 

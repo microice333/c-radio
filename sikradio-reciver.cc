@@ -81,6 +81,7 @@ int main (int argc, char *argv[]) {
     // rcv_len = read(sock, buffer, sizeof buffer);
     // printf("%ld %ld\n", data_read.session_id, data_read.first_byte_num);
       uint64_t xd = be64toh(data_read.first_byte_num);
+      // fprintf(stderr, "%ld\n", xd);
       if (xd == 1024 || xd == 512 || xd == 1536 || xd == 5632 || xd == 3584|| xd == 2048 || xd == 4096 || xd == 8192) {
         fprintf(stderr, "dostalem %ld\n", xd);
       }

@@ -8,8 +8,14 @@
 #include <mutex>
 
 struct Audio {
-	uint64_t session_id;
-  	uint64_t first_byte_num;
+	union {
+		uint64_t session_id;
+		char session_id_c[8];
+	};
+	union {
+  		uint64_t first_byte_num;
+  		char first_byte_num_c[8];
+  	};
   	char *audio_data;
 
   	void to_char_array(char result[], int size);
